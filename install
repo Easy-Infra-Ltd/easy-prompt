@@ -1,0 +1,38 @@
+#!usr/bin/env bash
+
+# Script to deploy a Go binary to user's bin directory and execute another script
+# Author: Claude
+# Date: February 26, 2025
+
+set -e  # Exit immediately if a command exits with a non-zero status
+
+# Configuration variables
+BINARY_NAME="easyprompt"
+SOURCE_PATH="./${BINARY_NAME}"
+TARGET_DIR="/usr/bin"
+
+# Print banner
+echo "=========================================="
+echo "  Easy Prompt Easy Install"
+echo "=========================================="
+
+# Check if the source binary exists
+if [ ! -f "${SOURCE_PATH}" ]; then
+    echo "Error: Binary not found at ${SOURCE_PATH}"
+    exit 1
+fi
+
+# Copy the binary to the target directory
+echo "Deploying ${BINARY_NAME} to ${TARGET_DIR}..."
+cp "${SOURCE_PATH}" "${TARGET_DIR}/"
+chmod +x "${TARGET_DIR}/${BINARY_NAME}"
+
+# Verify installation
+if [ -x "${TARGET_DIR}/${BINARY_NAME}" ]; then
+    echo "✔️  Binary successfully deployed to ${TARGET_DIR}/${BINARY_NAME}"
+else
+    echo "Error: Failed to deploy binary"
+    exit 1
+fi
+
+echo "✔️  Deployment complete!"

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+db_name="$(pwd)/prompt.db"
+sql_file="$(pwd)/sql/schema.sql"
+
+
+echo "Setting up database: $db_name using schema from $sql_file"
+
+# Check if SQLite is installed
+if command -v sqlite3 >/dev/null 2>&1; then
+    echo "✓ SQLite is already installed."
+    echo "SQLite version: $(sqlite3 --version)"
+else
+    echo "SQLite is not installed. Attempting to install..."
+
+    # Check the package manager and install SQLite
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "Using apt package manager"
+        sudo apt-get update
+        sudo apt-get install -y sqlite3
+    elif command -v yum >/dev/null 2>&1; then
+        echo "Using yum package manager"
+        sudo yum install -y sqlite
+    elif command -v brew >/dev/null 2>&1; then
+        echo "Using Homebrew package manager"
+        brew install sqlite
+    else
+        echo "ERROR: Could not determine package manager. Please install SQLite manually."
+        exit 1
+    fi
+
+    # Verify installation
+    if command -v sqlite3 >/dev/null 2>&1; then
+        echo "✓ SQLite installed successfully!"
+        echo "SQLite version: $(sqlite3 --version)"
+    else
+        echo "ERROR: SQLite installation failed."
+        exit 1
+    fi
+fi
+
+# Create the database using the SQL file
+echo "Creating database using SQL schema from $sql_file..."
+if [ -f "$sql_file" ]; then
+    sqlite3 $db_name < $sql_file
+else
+    echo "ERROR: SQL Schema files does not exist"
+    exit 1
+fi
+
+# Check if the database was created successfully
+if [ -f "$db_name" ]; then
+    echo "✓ Database created successfully: $db_name"
+    echo "Current database size: $(du -h $db_name | cut -f1)"
+
+    echo "✓ SQLite setup complete!"
+    echo "To interact with your database, run: sqlite3 $db_name"
+    echo "To modify your database schema, edit the $sql_file file and run this script again."
+else
+    echo "ERROR: Database creation failed."
+    exit 1
+fi
