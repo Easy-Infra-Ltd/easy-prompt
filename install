@@ -11,6 +11,8 @@ BINARY_NAME="easyprompt"
 SOURCE_PATH="./${BINARY_NAME}"
 TARGET_DIR="/usr/bin"
 
+tick='\033[0;32m✓\033[0m'
+
 # Print banner
 echo "=========================================="
 echo "  Easy Prompt Easy Install"
@@ -29,10 +31,10 @@ chmod +x "${TARGET_DIR}/${BINARY_NAME}"
 
 # Verify installation
 if [ -x "${TARGET_DIR}/${BINARY_NAME}" ]; then
-    echo "✔️  Binary successfully deployed to ${TARGET_DIR}/${BINARY_NAME}"
+    echo -e "${tick} Binary successfully deployed to ${TARGET_DIR}/${BINARY_NAME}"
 else
     echo "Error: Failed to deploy binary"
     exit 1
 fi
 
-echo "✔️  Deployment complete!"
+echo -e "${tick} Deployment complete!"
