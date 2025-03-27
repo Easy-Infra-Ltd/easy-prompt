@@ -5,26 +5,32 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Easy-Infra-Ltd/easy-prompt/src/anthropic"
+	"github.com/Easy-Infra-Ltd/easy-prompt/src/render"
 	"github.com/spf13/cobra"
 )
 
 func main() {
 	// TODO: Configure APIs and load configuration from ENV
-	// TODO:
-	var name string
 	var rootCmd = &cobra.Command{
-		Use:   "ask",
+		Use:   "easyprompt",
 		Short: "A simple CLI app to ask a question and read input",
 		Long:  "Usage: ask - A command-line tool to ask a question and capture user input.",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("What is your favorite programming language? ")
-			answer, _ := reader.ReadString('\n')
-			fmt.Printf("You answered: %s", answer)
+			fmt.Print("What would you like to know today?\n")
+			prompt, _ := reader.ReadString('\n')
+
+			client := anthropic.NewAnthropicClient("")
+			renderer := render.New(nil)
+			err := client.StartChat(renderer, anthropic.Claude3HaikuLatest, "", prompt)
+			if err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
-
-	rootCmd.Flags().StringVarP(&name, "name", "n", "User", "Your name")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
