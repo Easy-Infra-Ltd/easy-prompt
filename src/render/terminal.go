@@ -29,8 +29,21 @@ func New(messages []*message) *TerminalChat {
 
 	return &TerminalChat{
 		writer:   terminal.New(os.Stdout),
+		reader:   bufio.NewReader(os.Stdin),
 		messages: messages,
 	}
+}
+
+func (tc *TerminalChat) GetInput() (string, error) {
+	if err := tc.RenderMessage("What would you like to know today?", ""); err != nil {
+		return "", err
+	}
+
+	res, err := tc.reader.ReadString('\n')
+	tc.writer.AddLine()
+	tc.ClearMessage()
+
+	return res, err
 }
 
 func (tc *TerminalChat) RenderMessageAuthor(author string) error {
@@ -57,7 +70,6 @@ func (tc *TerminalChat) RenderMessageAuthor(author string) error {
 
 func (tc *TerminalChat) RenderMessage(text string, author string) error {
 	assert.Assert(text != "", "Text should never be an empty string, something has gone wrong")
-	assert.Assert(author != "", "Author should never be an empty string, something has gone wrong")
 
 	m := &message{
 		message: text,

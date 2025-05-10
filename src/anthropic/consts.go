@@ -17,7 +17,9 @@ const (
 )
 
 const (
-	TextContent = "text"
+	TextContent  = "text"
+	ImageContent = "image"
+	FileContent  = "file"
 )
 
 const (

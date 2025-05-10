@@ -57,8 +57,7 @@ func getAlignmentPadding(alignment TextAlignment) ([]byte, int) {
 	case AlignCenter:
 		return getPaddedBytes(thirdWidth), thirdWidth * 2
 	case AlignRight:
-		padding := getPaddedBytes(thirdWidth * 2)
-		return padding, termWidth
+		return getPaddedBytes(thirdWidth * 2), termWidth
 	default:
 		return []byte{}, thirdWidth
 	}
@@ -88,6 +87,13 @@ func (w *Writer) Reset() {
 	defer w.mtx.Unlock()
 	w.Buf.Reset()
 	w.lineCount = 0
+}
+
+func (w *Writer) AddLine() {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+
+	w.lineCount++
 }
 
 func (w *Writer) Print(alignment TextAlignment) error {

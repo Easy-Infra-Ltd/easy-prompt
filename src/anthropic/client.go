@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os"
 
 	"github.com/Easy-Infra-Ltd/assert"
+	"modernc.org/sqlite"
 )
 
 type AnthropicClient struct {
@@ -53,6 +55,9 @@ type ChatRenderer interface {
 }
 
 func (c *AnthropicClient) StartChat(renderer ChatRenderer, model string, systemPrompt string, message string) error {
+	assert.Assert(model != "", "Model must have a value")
+	assert.Assert(message != "", "Message must have a value")
+
 	c.chat = &AnthropicChat{
 		model:        model,
 		systemPrompt: systemPrompt,
@@ -64,7 +69,8 @@ func (c *AnthropicClient) StartChat(renderer ChatRenderer, model string, systemP
 }
 
 func (c *AnthropicClient) SendMessage(message *Message) error {
-	assert.NotNil(message, "Message passed to SendMessage shoud not be empty")
+	assert.NotNil(message, "Message passed to SendMessage should not be empty")
+	assert.NotNil(c.chat, "Chat must be initialised before sending a message")
 
 	messages := append(c.chat.messages, message)
 	requestBody := MessageRequest{
@@ -76,37 +82,38 @@ func (c *AnthropicClient) SendMessage(message *Message) error {
 		},
 	}
 
-	if err := c.chat.renderer.RenderMessageAuthor(message.Role); err != nil {
-		return err
-	}
+	if c.chat.renderer != nil {
+		if err := c.chat.renderer.RenderMessageAuthor(message.Role); err != nil {
+			return err
+		}
 
-	if err := c.chat.renderer.RenderMessage(message.Content, message.Role); err != nil {
-		return err
-	}
+		if err := c.chat.renderer.RenderMessage(message.Content, message.Role); err != nil {
+			return err
+		}
 
-	c.chat.renderer.EndMessage()
+		c.chat.renderer.EndMessage()
 
-	if err := c.chat.renderer.RenderMessageAuthor(RoleAssistant); err != nil {
-		return err
-	}
+		if err := c.chat.renderer.RenderMessageAuthor(RoleAssistant); err != nil {
+			return err
+		}
 
-	if err := c.chat.renderer.RenderMessage(fmt.Sprintf("%s Thinking...", RoleAssistant), RoleAssistant); err != nil {
-		return err
+		if err := c.chat.renderer.RenderMessage(fmt.Sprintf("%s Thinking...", RoleAssistant), RoleAssistant); err != nil {
+			return err
+		}
 	}
 
 	if c.chat.systemPrompt != "" {
 		requestBody.System = c.chat.systemPrompt
 	}
 
+	assert.NotNil(requestBody, "Request body must not be nil")
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-		// TODO: Handle return
 		return err
 	}
 
 	req, err := http.NewRequest("POST", c.baseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		// TODO: handle return
 		return err
 	}
 
@@ -116,13 +123,11 @@ func (c *AnthropicClient) SendMessage(message *Message) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// TODO: handle return
 		return err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		// TODO: handle return
 		return err
 	}
 
@@ -137,40 +142,64 @@ func (c *AnthropicClient) SendMessage(message *Message) error {
 
 	var response ChatResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		// TODO: handle marshal
 		return err
 	}
 
 	if response.Stop_reason == StopMaxTokens {
-		// TODO: handle max tokens
-		return err
+		return fmt.Errorf(response.Stop_reason)
 	}
 
 	if len(response.Content) == 0 {
-		// TODO: handle empty content response
-		return err
+		return fmt.Errorf("response content is empty")
 	}
 
-	c.chat.renderer.ClearMessage()
+	if c.chat.renderer != nil {
+		c.chat.renderer.ClearMessage()
+	}
 
 	for _, content := range response.Content {
-		if content.Type == TextContent {
+		switch content.Type {
+		case TextContent:
 			messages = append(messages, &Message{
 				Content: content.Text,
 				Role:    RoleAssistant,
 			})
 
-			if err := c.chat.renderer.RenderMessage(content.Text, RoleAssistant); err != nil {
-				return err
+			if c.chat.renderer != nil {
+				if err := c.chat.renderer.RenderMessage(content.Text, RoleAssistant); err != nil {
+					return err
+				}
 			}
+		case ImageContent:
+			if c.chat.renderer != nil {
+				if err := c.chat.renderer.RenderImage(content.Image); err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("unknown content type: %s", content.Type)
 		}
 	}
 
-	c.chat.renderer.EndMessage()
+	if c.chat.renderer != nil {
+		c.chat.renderer.EndMessage()
+	}
 
-	// TODO: Update chat to database
+	sqlDB, err := sql.Open("sqlite3", "prompt.db")
+	c.chat.save(sqlDB)
 
 	c.chat.messages = messages
 
 	return nil
+}
+
+func (c *AnthropicClient) EndChat() {
+	// Clear down any required parts
+	c.chat = nil
+}
+
+func (c *AnthropicChat) save(db *sql.DB) error {
+	// TODO: use sqlc to generate the insert statement
+	_, err := db.Exec("INSERT INTO chats (model, system_prompt, messages) VALUES (?, ?, ?)", c.model, c.systemPrompt, c.messages)
+	return err
 }
